@@ -213,11 +213,56 @@ module.exports.onStart = function () {
                         } else startService(mdl, services);
                     }
 
-                    // If evaluateScriptOnDocumentStart is true, send LaunchModule back immediately
-                    // so the UI can redirect to the target app. The script injection will happen
-                    // in debugger.js when Runtime.executionContextCreated fires.
+                    // If evaluateScriptOnDocumentStart is true, we need to:
+                    // 1. Connect to the current TizenBrew page via CDP
+                    // 2. Register the script with addScriptToEvaluateOnNewDocument
+                    // 3. THEN send LaunchModule back so UI can redirect
                     if (mdl.evaluateScriptOnDocumentStart) {
-                        wsConn.send(wsConn.Event(Events.LaunchModule, mdl.fullName));
+                        const CDP = require('chrome-remote-interface');
+                        const scriptUrl = `https://cdn.jsdelivr.net/${mdl.fullName}/${mdl.mainFile}`;
+                        
+                        // Fetch the script first
+                        fetch(scriptUrl).then(res => res.text()).then(scriptCode => {
+                            // Connect to the current page (TizenBrew UI) which is being debugged
+                            // The debug port was established when TizenBrew started
+                            const tbPackageId = tizen.application.getAppInfo().packageId;
+                            
+                            // Use ADB to get debug port for current app
+                            const adbClient2 = adbhost.createConnection({ host: '127.0.0.1', port: 26101 });
+                            adbClient2._stream.on('connect', () => {
+                                const shellCmd = adbClient2.createStream(`shell:0 debug ${tbPackageId}.TizenBrewStandalone${isTizen3 ? ' 0' : ''}`);
+                                shellCmd.on('data', function(data) {
+                                    const dataString = data.toString();
+                                    if (dataString.includes('debug')) {
+                                        const port = Number(dataString.substr(dataString.indexOf(':') + 1, 6).replace(' ', ''));
+                                        
+                                        // Connect via CDP and register script
+                                        CDP({ port, host: deviceIP || '127.0.0.1', local: true }, (client) => {
+                                            client.Page.enable();
+                                            // Register script for next navigation (to YouTube)
+                                            client.Page.addScriptToEvaluateOnNewDocument({ source: scriptCode }).then(() => {
+                                                console.log('Script registered for next navigation!');
+                                                // NOW send LaunchModule so UI can redirect
+                                                wsConn.send(wsConn.Event(Events.LaunchModule, mdl.fullName));
+                                                setTimeout(() => adbClient2._stream.end(), 500);
+                                            }).catch(e => {
+                                                console.error('Failed to register script:', e);
+                                                wsConn.send(wsConn.Event(Events.LaunchModule, mdl.fullName));
+                                            });
+                                        }).on('error', (err) => {
+                                            console.error('CDP connection failed:', err);
+                                            wsConn.send(wsConn.Event(Events.LaunchModule, mdl.fullName));
+                                        });
+                                    }
+                                });
+                            });
+                            adbClient2._stream.on('error', () => {
+                                wsConn.send(wsConn.Event(Events.LaunchModule, mdl.fullName));
+                            });
+                        }).catch(e => {
+                            console.error('Failed to fetch script:', e);
+                            wsConn.send(wsConn.Event(Events.LaunchModule, mdl.fullName));
+                        });
                     }
                     break;
                 }
