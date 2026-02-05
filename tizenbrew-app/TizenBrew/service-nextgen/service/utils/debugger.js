@@ -25,19 +25,31 @@ function startDebugging(port, queuedEvents, clientConn, ip, mdl, inDebug, appCon
                     `;
                     client.Runtime.evaluate({ expression, contextId: msg.context.id });
                 } else if (mdl.name !== '' && mdl.evaluateScriptOnDocumentStart) {
+                    // For evaluateScriptOnDocumentStart, we need to:
+                    // 1. Register the script for future navigations
+                    // 2. Execute it immediately on the current page
                     const cache = modulesCache.get(mdl.fullName);
                     const clientConnection = clientConn.get('wsConn');
+                    
+                    const executeScript = (scriptCode) => {
+                        // Register for future page loads
+                        client.Page.addScriptToEvaluateOnNewDocument({ expression: scriptCode });
+                        // Also execute immediately on current page
+                        client.Runtime.evaluate({ expression: scriptCode, contextId: msg.context.id });
+                    };
+                    
                     if (cache) {
-                        client.Page.addScriptToEvaluateOnNewDocument({ expression: cache });
+                        executeScript(cache);
                         sendClientInformation(clientConn, clientConnection.Event(Events.LaunchModule, mdl.fullName));
                     } else {
                         fetch(`https://cdn.jsdelivr.net/${mdl.fullName}/${mdl.mainFile}`).then(res => res.text()).then(modFile => {
                             modulesCache.set(mdl.fullName, modFile);
+                            executeScript(modFile);
                             sendClientInformation(clientConn, clientConnection.Event(Events.LaunchModule, mdl.fullName));
-                            client.Page.addScriptToEvaluateOnNewDocument({ expression: modFile });
                         }).catch(e => {
+                            const errorScript = `alert("Failed to load module: '${mdl.fullName}'. Please relaunch TizenBrew to try again.")`;
+                            executeScript(errorScript);
                             sendClientInformation(clientConn, clientConnection.Event(Events.LaunchModule, mdl.fullName));
-                            client.Page.addScriptToEvaluateOnNewDocument({ expression: `alert("Failed to load module: '${mdl.fullName}'. Please relaunch TizenBrew to try again.")` });
                         });
                     }
                 }
