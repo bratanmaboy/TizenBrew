@@ -212,6 +212,13 @@ module.exports.onStart = function () {
                             }
                         } else startService(mdl, services);
                     }
+
+                    // If evaluateScriptOnDocumentStart is true, send LaunchModule back immediately
+                    // so the UI can redirect to the target app. The script injection will happen
+                    // in debugger.js when Runtime.executionContextCreated fires.
+                    if (mdl.evaluateScriptOnDocumentStart) {
+                        wsConn.send(wsConn.Event(Events.LaunchModule, mdl.fullName));
+                    }
                     break;
                 }
                 case Events.StartService: {

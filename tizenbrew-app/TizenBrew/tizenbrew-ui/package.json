@@ -16,9 +16,11 @@
     "postcss-preset-env": "^10.1.2",
     "preact": "^10.25.3",
     "preact-iso": "^2.8.1",
+    "preact-render-to-string": "^6.6.5",
     "react": "npm:@preact/compat",
     "react-dom": "npm:@preact/compat",
-    "react-i18next": "^15.4.0"
+    "react-i18next": "^15.4.0",
+    "terser": "^5.46.0"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.9.3",
