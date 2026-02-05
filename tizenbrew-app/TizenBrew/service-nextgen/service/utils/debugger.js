@@ -25,10 +25,7 @@ function startDebugging(port, queuedEvents, clientConn, ip, mdl, inDebug, appCon
                     `;
                     client.Runtime.evaluate({ expression, contextId: msg.context.id });
                 } else if (mdl.name !== '' && mdl.evaluateScriptOnDocumentStart) {
-                    // For evaluateScriptOnDocumentStart, we need to:
-                    // 1. Register the script for future navigations
-                    // 2. Execute it immediately on the current page
-                    const cache = modulesCache.get(mdl.fullName);
+                    // For evaluateScriptOnDocumentStart - ALWAYS fetch fresh, no cache!
                     const clientConnection = clientConn.get('wsConn');
                     
                     const executeScript = (scriptCode) => {
@@ -38,20 +35,16 @@ function startDebugging(port, queuedEvents, clientConn, ip, mdl, inDebug, appCon
                         client.Runtime.evaluate({ expression: scriptCode, contextId: msg.context.id });
                     };
                     
-                    if (cache) {
-                        executeScript(cache);
+                    // Always fetch fresh - add cache buster
+                    const url = `https://cdn.jsdelivr.net/${mdl.fullName}/${mdl.mainFile}?_=${Date.now()}`;
+                    fetch(url).then(res => res.text()).then(modFile => {
+                        executeScript(modFile);
                         sendClientInformation(clientConn, clientConnection.Event(Events.LaunchModule, mdl.fullName));
-                    } else {
-                        fetch(`https://cdn.jsdelivr.net/${mdl.fullName}/${mdl.mainFile}`).then(res => res.text()).then(modFile => {
-                            modulesCache.set(mdl.fullName, modFile);
-                            executeScript(modFile);
-                            sendClientInformation(clientConn, clientConnection.Event(Events.LaunchModule, mdl.fullName));
-                        }).catch(e => {
-                            const errorScript = `alert("Failed to load module: '${mdl.fullName}'. Please relaunch TizenBrew to try again.")`;
-                            executeScript(errorScript);
-                            sendClientInformation(clientConn, clientConnection.Event(Events.LaunchModule, mdl.fullName));
-                        });
-                    }
+                    }).catch(e => {
+                        const errorScript = `alert("Failed to load module: '${mdl.fullName}'. Please relaunch TizenBrew to try again.")`;
+                        executeScript(errorScript);
+                        sendClientInformation(clientConn, clientConnection.Event(Events.LaunchModule, mdl.fullName));
+                    });
                 }
             });
 
