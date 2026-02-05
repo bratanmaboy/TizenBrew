@@ -27,6 +27,10 @@ async function createWgt() {
     const fixedDebugger = fs.readFileSync('service-nextgen/service/utils/debugger.js');
     newZip.file('service-nextgen/service/utils/debugger.js', fixedDebugger);
     
+    // Ersetze index.js mit unserer gefixten Version (wichtig für evaluateScriptOnDocumentStart fix!)
+    const fixedIndex = fs.readFileSync('service-nextgen/service/index.js');
+    newZip.file('service-nextgen/service/index.js', fixedIndex);
+    
     // Ersetze dist/index.js mit unserem gefixten Bundle
     const fixedBundle = fs.readFileSync('service-nextgen/service/dist/index.js');
     newZip.file('service-nextgen/service/dist/index.js', fixedBundle);
