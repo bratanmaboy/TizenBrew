@@ -29,14 +29,14 @@ function startDebugging(port, queuedEvents, clientConn, ip, mdl, inDebug, appCon
                     const clientConnection = clientConn.get('wsConn');
                     if (cache) {
                         client.Page.addScriptToEvaluateOnNewDocument({ expression: cache });
-                        sendClientInformation(clientConn, clientConnection.Event(Events.LaunchModule, mdl.name));
+                        sendClientInformation(clientConn, clientConnection.Event(Events.LaunchModule, mdl.fullName));
                     } else {
                         fetch(`https://cdn.jsdelivr.net/${mdl.fullName}/${mdl.mainFile}`).then(res => res.text()).then(modFile => {
                             modulesCache.set(mdl.fullName, modFile);
-                            sendClientInformation(clientConn, clientConnection.Event(Events.LaunchModule, mdl.name));
+                            sendClientInformation(clientConn, clientConnection.Event(Events.LaunchModule, mdl.fullName));
                             client.Page.addScriptToEvaluateOnNewDocument({ expression: modFile });
                         }).catch(e => {
-                            sendClientInformation(clientConn, clientConnection.Event(Events.LaunchModule, mdl.name));
+                            sendClientInformation(clientConn, clientConnection.Event(Events.LaunchModule, mdl.fullName));
                             client.Page.addScriptToEvaluateOnNewDocument({ expression: `alert("Failed to load module: '${mdl.fullName}'. Please relaunch TizenBrew to try again.")` });
                         });
                     }
